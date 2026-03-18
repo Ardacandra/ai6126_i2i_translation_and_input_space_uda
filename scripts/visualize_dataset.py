@@ -2,7 +2,7 @@
 """Verify and visualize all datasets are loaded correctly.
 
 Usage:
-    python visualize_dataset.py
+    python scripts/visualize_dataset.py
 
 Sample plots are saved to: out/viz/samples_*.png
 """
@@ -280,7 +280,7 @@ def plot_all_samples(dataset_root: Path, output_dir: Path) -> None:
 
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parent
+    repo_root = Path(__file__).resolve().parent.parent
     dataset_root = repo_root / "dataset"
     output_dir = repo_root / "out" / "viz"
     output_dir.mkdir(parents=True, exist_ok=True)

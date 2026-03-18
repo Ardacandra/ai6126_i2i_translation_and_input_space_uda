@@ -2,9 +2,9 @@
 """Download MNIST, SVHN, and USPS using torchvision into dataset/.
 
 Usage:
-    python download_torch_datasets.py
-    python download_torch_datasets.py --max-images-per-split 2000
-    python download_torch_datasets.py --skip-image-export
+    python scripts/download_torch_datasets.py
+    python scripts/download_torch_datasets.py --max-images-per-split 2000
+    python scripts/download_torch_datasets.py --skip-image-export
 """
 
 import argparse
@@ -124,7 +124,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    repo_root = Path(__file__).resolve().parent
+    repo_root = Path(__file__).resolve().parent.parent
     dataset_root = repo_root / "dataset"
 
     print(f"Downloading torchvision datasets into: {dataset_root}")

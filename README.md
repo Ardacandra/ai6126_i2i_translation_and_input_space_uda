@@ -62,7 +62,7 @@ The project expects datasets inside the `dataset/` directory.
 Run:
 
 ```bash
-python download_torch_datasets.py
+python scripts/download_torch_datasets.py
 ```
 
 This script downloads train/test splits into dataset-specific folders:
@@ -99,5 +99,50 @@ dataset/
 After downloading or placing all datasets, verify they are loaded correctly:
 
 ```bash
-python visualize_dataset.py
+python scripts/visualize_dataset.py
 ```
+
+## Running Experiments
+
+All configuration will be controlled in `config.yaml`. This repository will compare image style transfer in the following space:
+
+- `spatial`: standard CycleGAN in pixel space
+- `spectral`: Spectral CycleGAN where generated outputs are adapted in frequency space by translating low-frequency style while preserving high-frequency source content
+
+### Dataset Pairs
+
+The default config includes these 5 source -> target pairs:
+
+- MNIST -> USPS
+- SVHN -> MNIST
+- Amazon -> Webcam (Office-31)
+- Art -> Real-World (Office-Home)
+- Photo -> Sketch (PACS)
+
+### Run All Training Experiments
+
+From repository root:
+
+```bash
+python scripts/run_image_style_transfer.py --config config.yaml
+```
+
+Outputs are saved in:
+
+- `out/experiments/<pair_name>/spatial/`
+- `out/experiments/<pair_name>/spectral/`
+
+### Export Qualitative Comparison Figures
+
+After training completes, export side-by-side qualitative plots:
+
+```bash
+python scripts/export_qualitative_comparison.py --config config.yaml --num-samples 8
+```
+
+This creates one image per pair in `out/qualitative/` with rows:
+
+1. source image
+2. CycleGAN (spatial) translation
+3. Spectral CycleGAN translation
+4. target-domain reference image
