@@ -8,7 +8,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import torch
-from torchvision.utils import make_grid, save_image
+from PIL import Image, ImageDraw, ImageFont
+from torchvision.utils import make_grid
+from torchvision.transforms.functional import to_pil_image
 
 from src.config import DatasetPair, load_config
 from src.data import get_domain_images, make_eval_dataloader
@@ -52,6 +54,42 @@ def _load_generator_ab(checkpoint_path: Path, device: torch.device) -> ResnetGen
 
 def _denorm(x: torch.Tensor) -> torch.Tensor:
     return (x.clamp(-1.0, 1.0) + 1.0) / 2.0
+
+
+def _draw_row_labels(
+    grid: torch.Tensor,
+    row_labels: list[str],
+    row_height: int,
+    padding: int,
+    out_path: Path,
+) -> None:
+    grid_img = to_pil_image(grid)
+    font = ImageFont.load_default()
+
+    draw_probe = ImageDraw.Draw(grid_img)
+    label_widths = []
+    for label in row_labels:
+        bbox = draw_probe.textbbox((0, 0), label, font=font)
+        label_widths.append(bbox[2] - bbox[0])
+
+    left_margin = max(label_widths) + 16
+    canvas = Image.new("RGB", (grid_img.width + left_margin, grid_img.height), color=(255, 255, 255))
+    canvas.paste(grid_img, (left_margin, 0))
+
+    draw = ImageDraw.Draw(canvas)
+    for row_idx, label in enumerate(row_labels):
+        bbox = draw.textbbox((0, 0), label, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+        y_top = padding + row_idx * (row_height + padding)
+        y_center = y_top + row_height // 2
+
+        x = left_margin - text_w - 8
+        y = y_center - text_h // 2
+        draw.text((x, y), label, fill=(0, 0, 0), font=font)
+
+    canvas.save(out_path)
 
 
 def export_pair(
@@ -110,11 +148,19 @@ def export_pair(
     )
 
     nrow = src_batch.shape[0]
-    grid = make_grid(rows, nrow=nrow)
+    grid_padding = 2
+    grid = make_grid(rows, nrow=nrow, padding=grid_padding)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{pair.name}_spatial_vs_spectral.png"
-    save_image(grid, out_path)
+    row_labels = ["Source", "Spatial", "Spectral", "Target"]
+    _draw_row_labels(
+        grid=grid,
+        row_labels=row_labels,
+        row_height=src_batch.shape[-2],
+        padding=grid_padding,
+        out_path=out_path,
+    )
     return out_path
 
 

@@ -32,9 +32,9 @@ training:
   image_size: 128
   batch_size: 8
   num_workers: 4
-  epochs: 40
+  epochs: 30
   steps_per_epoch: 400
-  lr: 0.0002
+  lr: 0.00010
   betas: [0.5, 0.999]
   lambda_cycle: 10.0
   lambda_identity: 5.0
