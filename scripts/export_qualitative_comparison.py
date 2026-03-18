@@ -71,6 +71,12 @@ def export_pair(
     domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
     enforce_grayscale_channels = domain_set.issubset({"mnist", "usps"})
 
+    # Shuffle image lists for diverse multi-category sampling while maintaining reproducibility
+    import random
+    rng = random.Random(42)
+    rng.shuffle(src_images)
+    rng.shuffle(tgt_images)
+
     loader_src = make_eval_dataloader(src_images, cfg.training.image_size, num_samples)
     loader_tgt = make_eval_dataloader(tgt_images, cfg.training.image_size, num_samples)
     src_batch = next(iter(loader_src))["image"].to(device)
