@@ -68,6 +68,8 @@ def export_pair(
 
     src_images = get_domain_images(cfg.dataset_root, pair.source)
     tgt_images = get_domain_images(cfg.dataset_root, pair.target)
+    domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
+    enforce_grayscale_channels = domain_set.issubset({"mnist", "usps"})
 
     loader_src = make_eval_dataloader(src_images, cfg.training.image_size, num_samples)
     loader_tgt = make_eval_dataloader(tgt_images, cfg.training.image_size, num_samples)
@@ -88,6 +90,7 @@ def export_pair(
             generated=fake_spectral_raw,
             source=src_batch,
             low_freq_ratio=cfg.training.spectral_low_freq_ratio,
+            enforce_grayscale_channels=enforce_grayscale_channels,
         )
 
     rows = torch.cat(

@@ -4,6 +4,7 @@ from typing import Literal
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 MethodType = Literal["spatial", "spectral"]
 
@@ -122,25 +123,83 @@ def init_weights(module: nn.Module) -> None:
             nn.init.constant_(module.bias.data, 0.0)
 
 
+def _gaussian_blur_mask(mask: torch.Tensor, sigma_y: float, sigma_x: float) -> torch.Tensor:
+    radius_y = max(1, int(3.0 * sigma_y))
+    radius_x = max(1, int(3.0 * sigma_x))
+
+    y = torch.arange(-radius_y, radius_y + 1, device=mask.device, dtype=mask.dtype)
+    x = torch.arange(-radius_x, radius_x + 1, device=mask.device, dtype=mask.dtype)
+    kernel_y = torch.exp(-0.5 * (y / sigma_y) ** 2)
+    kernel_x = torch.exp(-0.5 * (x / sigma_x) ** 2)
+    kernel_2d = kernel_y[:, None] * kernel_x[None, :]
+    kernel_2d = kernel_2d / kernel_2d.sum().clamp_min(1e-12)
+    kernel = kernel_2d.view(1, 1, kernel_2d.shape[0], kernel_2d.shape[1])
+
+    blurred = F.conv2d(mask, kernel, padding=(radius_y, radius_x))
+    return blurred / blurred.amax(dim=(-2, -1), keepdim=True).clamp_min(1e-6)
+
+
+def to_log_amplitude_map(image: torch.Tensor, output_channels: int = 3) -> torch.Tensor:
+    """Map image to normalized log-amplitude spectrum for GAN training."""
+    gray = image.mean(dim=1, keepdim=True)
+    spectrum = torch.fft.fft2(gray, dim=(-2, -1))
+    log_amp = torch.log1p(torch.abs(spectrum))
+
+    mean = log_amp.mean(dim=(-2, -1), keepdim=True)
+    std = log_amp.std(dim=(-2, -1), keepdim=True).clamp_min(1e-6)
+    normalized = torch.tanh((log_amp - mean) / std)
+
+    if output_channels == 1:
+        return normalized
+    return normalized.repeat(1, output_channels, 1, 1)
+
+
 def low_frequency_blend(
     stylized: torch.Tensor,
     source: torch.Tensor,
     low_freq_ratio: float,
+    enforce_grayscale_channels: bool = False,
 ) -> torch.Tensor:
-    """Blend low frequencies from stylized output with high frequencies from source."""
-    h, w = stylized.shape[-2], stylized.shape[-1]
-    fft_style = torch.fft.fftshift(torch.fft.fft2(stylized, dim=(-2, -1)), dim=(-2, -1))
-    fft_source = torch.fft.fftshift(torch.fft.fft2(source, dim=(-2, -1)), dim=(-2, -1))
+    """Blend low frequencies from stylized output with high frequencies from source.
 
-    cy, cx = h // 2, w // 2
+    Uses rfft2/irfft2 instead of fft2+fftshift so that irfft2 always returns a
+    purely real tensor by construction.  The previous fft2 approach produced an
+    off-by-one asymmetric mask ([cy-ry:cy+ry] is not centred on cy) which broke
+    Hermitian symmetry in the mixed spectrum; the imaginary residual discarded by
+    .real then appeared as per-channel phase-shift colour artifacts.
+    """
+    if enforce_grayscale_channels:
+        stylized_proc = stylized.mean(dim=1, keepdim=True)
+        source_proc = source.mean(dim=1, keepdim=True)
+    else:
+        stylized_proc = stylized
+        source_proc = source
+
+    h, w = stylized_proc.shape[-2], stylized_proc.shape[-1]
+    fw = w // 2 + 1  # rfft2 retains only non-negative x-frequencies
+
+    fft_style = torch.fft.rfft2(stylized_proc, dim=(-2, -1))
+    fft_source = torch.fft.rfft2(source_proc, dim=(-2, -1))
+
     ry = max(1, int(h * low_freq_ratio / 2.0))
     rx = max(1, int(w * low_freq_ratio / 2.0))
 
-    mask = torch.zeros((1, 1, h, w), dtype=torch.float32, device=stylized.device)
-    mask[..., cy - ry : cy + ry, cx - rx : cx + rx] = 1.0
+    mask = torch.zeros((1, 1, h, fw), dtype=torch.float32, device=stylized_proc.device)
+    # Low-freq rows: 0..ry-1 (positive freqs) and h-ry..h-1 (negative/conjugate freqs)
+    mask[..., :ry, :rx] = 1.0
+    mask[..., h - ry :, :rx] = 1.0
+
+    sigma_y = max(1.0, float(ry) / 2.0)
+    sigma_x = max(1.0, float(rx) / 2.0)
+    mask = _gaussian_blur_mask(mask, sigma_y=sigma_y, sigma_x=sigma_x)
 
     mixed_fft = fft_style * mask + fft_source * (1.0 - mask)
-    mixed = torch.fft.ifft2(torch.fft.ifftshift(mixed_fft, dim=(-2, -1)), dim=(-2, -1)).real
+    # irfft2 always returns a real tensor — no .real needed, no imaginary residual
+    mixed = torch.fft.irfft2(mixed_fft, s=(h, w), dim=(-2, -1))
+
+    if enforce_grayscale_channels and stylized.shape[1] > 1:
+        mixed = mixed.repeat(1, stylized.shape[1], 1, 1)
+
     return mixed.clamp(-1.0, 1.0)
 
 
@@ -149,6 +208,7 @@ def adapt_output_for_method(
     generated: torch.Tensor,
     source: torch.Tensor,
     low_freq_ratio: float,
+    enforce_grayscale_channels: bool = False,
 ) -> torch.Tensor:
     if method == "spatial":
         return generated
@@ -156,4 +216,5 @@ def adapt_output_for_method(
         stylized=generated,
         source=source,
         low_freq_ratio=low_freq_ratio,
+        enforce_grayscale_channels=enforce_grayscale_channels,
     )

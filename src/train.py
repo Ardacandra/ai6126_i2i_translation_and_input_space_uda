@@ -17,6 +17,7 @@ from src.models import (
     ResnetGenerator,
     adapt_output_for_method,
     init_weights,
+    to_log_amplitude_map,
 )
 
 
@@ -123,6 +124,9 @@ def train_one_experiment(
     with log_path.open("w", encoding="utf-8") as log_file:
         log_file.write(f"pair={pair.name}, method={method}, device={device}\n")
 
+    domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
+    enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
+
     for epoch in range(1, train_cfg.epochs + 1):
         epoch_losses = {"g": 0.0, "d_a": 0.0, "d_b": 0.0}
 
@@ -144,12 +148,14 @@ def train_one_experiment(
                     generated=fake_b_raw,
                     source=real_a,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
                 fake_a = adapt_output_for_method(
                     method=method,
                     generated=fake_a_raw,
                     source=real_b,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
 
                 rec_a_raw = g_ba(fake_b)
@@ -159,12 +165,14 @@ def train_one_experiment(
                     generated=rec_a_raw,
                     source=fake_b,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
                 rec_b = adapt_output_for_method(
                     method=method,
                     generated=rec_b_raw,
                     source=fake_a,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
 
                 id_a_raw = g_ba(real_a)
@@ -174,21 +182,34 @@ def train_one_experiment(
                     generated=id_a_raw,
                     source=real_a,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
                 id_b = adapt_output_for_method(
                     method=method,
                     generated=id_b_raw,
                     source=real_b,
                     low_freq_ratio=train_cfg.spectral_low_freq_ratio,
+                    enforce_grayscale_channels=enforce_grayscale_channels,
                 )
 
-                valid_b = torch.ones_like(d_b(real_b))
-                valid_a = torch.ones_like(d_a(real_a))
+                if method == "spectral":
+                    real_a_gan = to_log_amplitude_map(real_a, output_channels=real_a.shape[1])
+                    real_b_gan = to_log_amplitude_map(real_b, output_channels=real_b.shape[1])
+                    fake_a_gan = to_log_amplitude_map(fake_a, output_channels=fake_a.shape[1])
+                    fake_b_gan = to_log_amplitude_map(fake_b, output_channels=fake_b.shape[1])
+                else:
+                    real_a_gan = real_a
+                    real_b_gan = real_b
+                    fake_a_gan = fake_a
+                    fake_b_gan = fake_b
+
+                valid_b = torch.ones_like(d_b(real_b_gan))
+                valid_a = torch.ones_like(d_a(real_a_gan))
                 fake_target_b = torch.zeros_like(valid_b)
                 fake_target_a = torch.zeros_like(valid_a)
 
-                loss_gan_ab = criterion_gan(d_b(fake_b), valid_b)
-                loss_gan_ba = criterion_gan(d_a(fake_a), valid_a)
+                loss_gan_ab = criterion_gan(d_b(fake_b_gan), valid_b)
+                loss_gan_ba = criterion_gan(d_a(fake_a_gan), valid_a)
                 loss_cycle = criterion_cycle(rec_a, real_a) + criterion_cycle(rec_b, real_b)
                 loss_identity = criterion_identity(id_a, real_a) + criterion_identity(id_b, real_b)
                 loss_g = (
@@ -203,8 +224,17 @@ def train_one_experiment(
             scaler.step(opt_g)
 
             with autocast(enabled=use_amp):
-                loss_d_a_real = criterion_gan(d_a(real_a), valid_a)
-                loss_d_a_fake = criterion_gan(d_a(fake_a.detach()), fake_target_a)
+                if method == "spectral":
+                    real_a_d = to_log_amplitude_map(real_a, output_channels=real_a.shape[1])
+                    fake_a_d = to_log_amplitude_map(
+                        fake_a.detach(), output_channels=fake_a.shape[1]
+                    )
+                else:
+                    real_a_d = real_a
+                    fake_a_d = fake_a.detach()
+
+                loss_d_a_real = criterion_gan(d_a(real_a_d), valid_a)
+                loss_d_a_fake = criterion_gan(d_a(fake_a_d), fake_target_a)
                 loss_d_a = 0.5 * (loss_d_a_real + loss_d_a_fake)
 
             opt_d_a.zero_grad(set_to_none=True)
@@ -212,8 +242,17 @@ def train_one_experiment(
             scaler.step(opt_d_a)
 
             with autocast(enabled=use_amp):
-                loss_d_b_real = criterion_gan(d_b(real_b), valid_b)
-                loss_d_b_fake = criterion_gan(d_b(fake_b.detach()), fake_target_b)
+                if method == "spectral":
+                    real_b_d = to_log_amplitude_map(real_b, output_channels=real_b.shape[1])
+                    fake_b_d = to_log_amplitude_map(
+                        fake_b.detach(), output_channels=fake_b.shape[1]
+                    )
+                else:
+                    real_b_d = real_b
+                    fake_b_d = fake_b.detach()
+
+                loss_d_b_real = criterion_gan(d_b(real_b_d), valid_b)
+                loss_d_b_fake = criterion_gan(d_b(fake_b_d), fake_target_b)
                 loss_d_b = 0.5 * (loss_d_b_real + loss_d_b_fake)
 
             opt_d_b.zero_grad(set_to_none=True)
