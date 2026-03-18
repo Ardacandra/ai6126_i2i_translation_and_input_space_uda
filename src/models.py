@@ -141,17 +141,23 @@ def _gaussian_blur_mask(mask: torch.Tensor, sigma_y: float, sigma_x: float) -> t
 
 def to_log_amplitude_map(image: torch.Tensor, output_channels: int = 3) -> torch.Tensor:
     """Map image to normalized log-amplitude spectrum for GAN training."""
-    gray = image.mean(dim=1, keepdim=True)
-    spectrum = torch.fft.fft2(gray, dim=(-2, -1))
+    if output_channels == 1:
+        spectral_input = image.mean(dim=1, keepdim=True)
+    else:
+        spectral_input = image
+
+    spectrum = torch.fft.fft2(spectral_input, dim=(-2, -1))
     log_amp = torch.log1p(torch.abs(spectrum))
 
     mean = log_amp.mean(dim=(-2, -1), keepdim=True)
     std = log_amp.std(dim=(-2, -1), keepdim=True).clamp_min(1e-6)
     normalized = torch.tanh((log_amp - mean) / std)
 
-    if output_channels == 1:
+    if normalized.shape[1] == output_channels:
         return normalized
-    return normalized.repeat(1, output_channels, 1, 1)
+    if output_channels == 1:
+        return normalized.mean(dim=1, keepdim=True)
+    return normalized.mean(dim=1, keepdim=True).repeat(1, output_channels, 1, 1)
 
 
 def low_frequency_blend(

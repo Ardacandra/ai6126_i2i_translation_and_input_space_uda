@@ -121,7 +121,12 @@ def train_one_experiment(
     scaler = GradScaler(enabled=use_amp)
 
     domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
-    enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
+    if train_cfg.spectral_color_mode == "grayscale":
+        enforce_grayscale_channels = True
+    elif train_cfg.spectral_color_mode == "rgb":
+        enforce_grayscale_channels = False
+    else:
+        enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
 
     exp_dir.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8") as log_file:
@@ -143,6 +148,7 @@ def train_one_experiment(
         log_file.write(f"lambda_cycle={train_cfg.lambda_cycle}\n")
         log_file.write(f"lambda_identity={train_cfg.lambda_identity}\n")
         log_file.write(f"spectral_low_freq_ratio={train_cfg.spectral_low_freq_ratio}\n")
+        log_file.write(f"spectral_color_mode={train_cfg.spectral_color_mode}\n")
         log_file.write(f"save_every_epochs={train_cfg.save_every_epochs}\n")
         log_file.write(f"sample_every_epochs={train_cfg.sample_every_epochs}\n")
         log_file.write(f"sample_count={train_cfg.sample_count}\n")
@@ -219,10 +225,12 @@ def train_one_experiment(
                 )
 
                 if method == "spectral":
-                    real_a_gan = to_log_amplitude_map(real_a, output_channels=real_a.shape[1])
-                    real_b_gan = to_log_amplitude_map(real_b, output_channels=real_b.shape[1])
-                    fake_a_gan = to_log_amplitude_map(fake_a, output_channels=fake_a.shape[1])
-                    fake_b_gan = to_log_amplitude_map(fake_b, output_channels=fake_b.shape[1])
+                    spectral_channels_a = 1 if enforce_grayscale_channels else real_a.shape[1]
+                    spectral_channels_b = 1 if enforce_grayscale_channels else real_b.shape[1]
+                    real_a_gan = to_log_amplitude_map(real_a, output_channels=spectral_channels_a)
+                    real_b_gan = to_log_amplitude_map(real_b, output_channels=spectral_channels_b)
+                    fake_a_gan = to_log_amplitude_map(fake_a, output_channels=spectral_channels_a)
+                    fake_b_gan = to_log_amplitude_map(fake_b, output_channels=spectral_channels_b)
                 else:
                     real_a_gan = real_a
                     real_b_gan = real_b
@@ -251,9 +259,10 @@ def train_one_experiment(
 
             with autocast(enabled=use_amp):
                 if method == "spectral":
-                    real_a_d = to_log_amplitude_map(real_a, output_channels=real_a.shape[1])
+                    spectral_channels_a = 1 if enforce_grayscale_channels else real_a.shape[1]
+                    real_a_d = to_log_amplitude_map(real_a, output_channels=spectral_channels_a)
                     fake_a_d = to_log_amplitude_map(
-                        fake_a.detach(), output_channels=fake_a.shape[1]
+                        fake_a.detach(), output_channels=spectral_channels_a
                     )
                 else:
                     real_a_d = real_a
@@ -269,9 +278,10 @@ def train_one_experiment(
 
             with autocast(enabled=use_amp):
                 if method == "spectral":
-                    real_b_d = to_log_amplitude_map(real_b, output_channels=real_b.shape[1])
+                    spectral_channels_b = 1 if enforce_grayscale_channels else real_b.shape[1]
+                    real_b_d = to_log_amplitude_map(real_b, output_channels=spectral_channels_b)
                     fake_b_d = to_log_amplitude_map(
-                        fake_b.detach(), output_channels=fake_b.shape[1]
+                        fake_b.detach(), output_channels=spectral_channels_b
                     )
                 else:
                     real_b_d = real_b

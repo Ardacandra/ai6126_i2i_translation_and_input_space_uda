@@ -39,6 +39,7 @@ training:
   lambda_cycle: 10.0
   lambda_identity: 5.0
   spectral_low_freq_ratio: 0.2
+  spectral_color_mode: auto  # options: auto, grayscale, rgb
   save_every_epochs: 10
   sample_every_epochs: 5
   sample_count: 8

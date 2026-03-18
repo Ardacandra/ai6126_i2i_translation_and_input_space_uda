@@ -107,7 +107,12 @@ def export_pair(
     src_images = get_domain_images(cfg.dataset_root, pair.source)
     tgt_images = get_domain_images(cfg.dataset_root, pair.target)
     domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
-    enforce_grayscale_channels = domain_set.issubset({"mnist", "usps"})
+    if cfg.training.spectral_color_mode == "grayscale":
+        enforce_grayscale_channels = True
+    elif cfg.training.spectral_color_mode == "rgb":
+        enforce_grayscale_channels = False
+    else:
+        enforce_grayscale_channels = domain_set.issubset({"mnist", "usps"})
 
     # Shuffle image lists for diverse multi-category sampling while maintaining reproducibility
     import random

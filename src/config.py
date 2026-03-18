@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Literal
 import yaml
 
 MethodType = Literal["spatial", "spectral"]
+SpectralColorMode = Literal["auto", "grayscale", "rgb"]
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,7 @@ class TrainingConfig:
     lambda_cycle: float
     lambda_identity: float
     spectral_low_freq_ratio: float
+    spectral_color_mode: SpectralColorMode
     save_every_epochs: int
     sample_every_epochs: int
     sample_count: int
@@ -69,11 +71,17 @@ def load_config(config_path: str | Path) -> ExperimentConfig:
         lambda_cycle=float(raw["training"]["lambda_cycle"]),
         lambda_identity=float(raw["training"]["lambda_identity"]),
         spectral_low_freq_ratio=float(raw["training"]["spectral_low_freq_ratio"]),
+        spectral_color_mode=str(raw["training"].get("spectral_color_mode", "auto")).strip().lower(),
         save_every_epochs=int(raw["training"]["save_every_epochs"]),
         sample_every_epochs=int(raw["training"]["sample_every_epochs"]),
         sample_count=int(raw["training"]["sample_count"]),
         use_amp=bool(raw["training"]["use_amp"]),
     )
+
+    if training.spectral_color_mode not in {"auto", "grayscale", "rgb"}:
+        raise ValueError(
+            "training.spectral_color_mode must be one of: auto, grayscale, rgb"
+        )
 
     methods = [entry.strip().lower() for entry in raw["methods"]]
     for m in methods:
