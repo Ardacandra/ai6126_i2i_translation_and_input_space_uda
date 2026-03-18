@@ -211,3 +211,7 @@ tc2_logs/
 *.err
 *.out
 *.sh
+
+# Project local files
+dataset/
+out/

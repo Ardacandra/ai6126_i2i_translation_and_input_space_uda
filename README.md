@@ -26,3 +26,78 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 # Install all other project dependencies from requirements.txt
 pip install -r requirements.txt
 ```
+
+### 3. Prepare Dataset
+
+The project expects datasets inside the `dataset/` directory.
+
+### Downloaded Datasets
+
+- Office-31  
+	Reference link: `https://github.com/jindongwang/transferlearning/blob/master/data/dataset.md#office-31`  
+	Local path: `dataset/office31/`  
+
+- Office-Home  
+	Reference link: `https://www.hemanthdv.org/officeHomeDataset.html`  
+	Local path: `dataset/OfficeHomeDataset/`  
+
+- PACS  
+	Reference link: `https://www.kaggle.com/datasets/ma3ple/pacs-dataset`  
+	Local path: `dataset/pacs/`  
+
+- MNIST (via torchvision)  
+	Reference link: `https://pytorch.org/vision/stable/generated/torchvision.datasets.MNIST.html`  
+	Local path: `dataset/MNIST/`  
+
+- SVHN (via torchvision)  
+	Reference link: `https://pytorch.org/vision/stable/generated/torchvision.datasets.SVHN.html`  
+	Local path: `dataset/SVHN/`  
+
+- USPS (via torchvision)  
+	Reference link: `https://pytorch.org/vision/stable/generated/torchvision.datasets.USPS.html`  
+	Local path: `dataset/USPS/`  
+
+### Download MNIST, SVHN, USPS from PyTorch
+
+Run:
+
+```bash
+python download_torch_datasets.py
+```
+
+This script downloads train/test splits into dataset-specific folders:
+
+- `dataset/MNIST/`
+- `dataset/SVHN/`
+- `dataset/USPS/`
+
+### Verify All Datasets
+
+Expected directory tree:
+
+```text
+dataset/
+├── office31/
+│   ├── amazon/
+│   ├── dslr/
+│   └── webcam/
+├── OfficeHomeDataset/
+│   ├── Art/
+│   ├── Clipart/
+│   ├── Product/
+│   └── Real World/
+├── pacs/
+│   ├── art_painting/
+│   ├── cartoon/
+│   ├── photo/
+│   └── sketch/
+├── MNIST/
+├── SVHN/
+└── USPS/
+```
+
+After downloading or placing all datasets, verify they are loaded correctly:
+
+```bash
+python visualize_dataset.py
+```
