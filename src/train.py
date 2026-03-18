@@ -120,12 +120,38 @@ def train_one_experiment(
     use_amp = train_cfg.use_amp and device.type == "cuda"
     scaler = GradScaler(enabled=use_amp)
 
-    exp_dir.mkdir(parents=True, exist_ok=True)
-    with log_path.open("w", encoding="utf-8") as log_file:
-        log_file.write(f"pair={pair.name}, method={method}, device={device}\n")
-
     domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
     enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
+
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        log_file.write("[run]\n")
+        log_file.write(f"pair_name={pair.name}\n")
+        log_file.write(f"source_domain={pair.source}\n")
+        log_file.write(f"target_domain={pair.target}\n")
+        log_file.write(f"method={method}\n")
+        log_file.write(f"device={device}\n")
+        log_file.write(f"seed={config.seed}\n")
+        log_file.write("\n[training_hyperparams]\n")
+        log_file.write(f"image_size={train_cfg.image_size}\n")
+        log_file.write(f"batch_size={train_cfg.batch_size}\n")
+        log_file.write(f"num_workers={train_cfg.num_workers}\n")
+        log_file.write(f"epochs={train_cfg.epochs}\n")
+        log_file.write(f"steps_per_epoch={train_cfg.steps_per_epoch}\n")
+        log_file.write(f"lr={train_cfg.lr}\n")
+        log_file.write(f"betas={train_cfg.betas}\n")
+        log_file.write(f"lambda_cycle={train_cfg.lambda_cycle}\n")
+        log_file.write(f"lambda_identity={train_cfg.lambda_identity}\n")
+        log_file.write(f"spectral_low_freq_ratio={train_cfg.spectral_low_freq_ratio}\n")
+        log_file.write(f"save_every_epochs={train_cfg.save_every_epochs}\n")
+        log_file.write(f"sample_every_epochs={train_cfg.sample_every_epochs}\n")
+        log_file.write(f"sample_count={train_cfg.sample_count}\n")
+        log_file.write(f"use_amp_config={train_cfg.use_amp}\n")
+        log_file.write(f"use_amp_effective={use_amp}\n")
+        log_file.write(
+            f"enforce_grayscale_channels={enforce_grayscale_channels}\n"
+        )
+        log_file.write("\n[epoch_losses]\n")
 
     for epoch in range(1, train_cfg.epochs + 1):
         epoch_losses = {"g": 0.0, "d_a": 0.0, "d_b": 0.0}
