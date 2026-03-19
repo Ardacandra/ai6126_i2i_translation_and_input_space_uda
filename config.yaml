@@ -7,6 +7,13 @@ dataset:
 output:
   root: out/experiments
 
+uda_output:
+  root: out/uda_results
+
+# Directory where Task I CycleGAN checkpoints live
+# (e.g. out/experiments/mnist_to_usps/spatial/checkpoints/epoch_030.pt)
+cyclegan_output_root: out/experiments
+
 methods:
   - spatial
   - spectral
@@ -44,3 +51,31 @@ training:
   sample_every_epochs: 5
   sample_count: 8
   use_amp: true
+
+# Task II: methods to benchmark
+uda_methods:
+  - source_only
+  - cyclegan
+  - spectral_cyclegan
+  - cycada
+  - fda
+
+# Task II: classifier training config
+classifier_training:
+  image_size: 128
+  batch_size: 32
+  num_workers: 4
+  epochs: 30
+  steps_per_epoch: 300
+  lr: 0.001
+  weight_decay: 0.0001
+  use_amp: true
+  pretrained_backbone: true
+
+fda:
+  # Low-frequency ratio for amplitude swap (beta in the FDA paper)
+  beta: 0.1
+
+cycada:
+  # Weight on the feature-level domain adversarial loss
+  lambda_domain: 0.1

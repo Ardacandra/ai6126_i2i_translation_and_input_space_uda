@@ -104,10 +104,7 @@ python scripts/visualize_dataset.py
 
 ## Running Experiments
 
-All configuration will be controlled in `config.yaml`. This repository will compare image style transfer in the following space:
-
-- `spatial`: standard CycleGAN in pixel space
-- `spectral`: Spectral CycleGAN where generated outputs are adapted in frequency space by translating low-frequency style while preserving high-frequency source content
+All configuration is controlled in `config.yaml`.
 
 ### Dataset Pairs
 
@@ -119,7 +116,12 @@ The default config includes these 5 source -> target pairs:
 - Art -> Real-World (Office-Home)
 - Photo -> Sketch (PACS)
 
-### Run All Training Experiments
+### Task I: Image Style Transfer
+
+For Task I image style transfer, this repository compares the following spaces:
+
+- `spatial`: standard CycleGAN in pixel space
+- `spectral`: Spectral CycleGAN where generated outputs are adapted in frequency space by translating low-frequency style while preserving high-frequency source content
 
 From repository root:
 
@@ -146,3 +148,44 @@ This creates one image per pair in `out/qualitative/` with rows:
 2. CycleGAN (spatial) translation
 3. Spectral CycleGAN translation
 4. target-domain reference image
+
+## Task II: UDA Benchmark
+
+Task II benchmarks five input-space UDA methods over the same dataset pairs:
+
+- `source_only`
+- `cyclegan`
+- `spectral_cyclegan`
+- `cycada`
+- `fda`
+
+### Run UDA Benchmark
+
+```bash
+python scripts/run_uda_benchmark.py --config config.yaml
+```
+
+By default this will:
+
+- read Task II settings from `config.yaml`
+- load Task I generators from `cyclegan_output_root`
+- save UDA metrics to `uda_output.root` (default: `out/uda_results/`)
+
+Saved files:
+
+- `out/uda_results/results.csv`
+- `out/uda_results/results.json`
+
+### Export Task II Qualitative Figures
+
+```bash
+python scripts/export_uda_qualitative.py --config config.yaml --num-samples 8
+```
+
+This creates one comparison image per pair in `out/uda_qualitative/` with rows:
+
+1. source image
+2. CycleGAN (spatial) translation
+3. Spectral CycleGAN translation
+4. FDA translation
+5. target-domain reference image
