@@ -95,10 +95,20 @@ def train_one_experiment(
     loader, _, _ = make_train_dataloader(config.dataset_root, pair, train_cfg)
     loader_iter = iter(loader)
 
+    domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
+    if train_cfg.spectral_color_mode == "grayscale":
+        enforce_grayscale_channels = True
+    elif train_cfg.spectral_color_mode == "rgb":
+        enforce_grayscale_channels = False
+    else:
+        enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
+
+    discriminator_input_nc = 1 if (method == "spectral" and enforce_grayscale_channels) else 3
+
     g_ab = ResnetGenerator().to(device)
     g_ba = ResnetGenerator().to(device)
-    d_a = PatchDiscriminator().to(device)
-    d_b = PatchDiscriminator().to(device)
+    d_a = PatchDiscriminator(input_nc=discriminator_input_nc).to(device)
+    d_b = PatchDiscriminator(input_nc=discriminator_input_nc).to(device)
 
     g_ab.apply(init_weights)
     g_ba.apply(init_weights)
@@ -119,14 +129,6 @@ def train_one_experiment(
 
     use_amp = train_cfg.use_amp and device.type == "cuda"
     scaler = GradScaler(enabled=use_amp)
-
-    domain_set = {pair.source.strip().lower(), pair.target.strip().lower()}
-    if train_cfg.spectral_color_mode == "grayscale":
-        enforce_grayscale_channels = True
-    elif train_cfg.spectral_color_mode == "rgb":
-        enforce_grayscale_channels = False
-    else:
-        enforce_grayscale_channels = method == "spectral" and domain_set.issubset({"mnist", "usps"})
 
     exp_dir.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8") as log_file:
