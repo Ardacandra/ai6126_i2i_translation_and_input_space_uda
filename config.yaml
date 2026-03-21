@@ -7,6 +7,13 @@ dataset:
 output:
   root: out/experiments
 
+qualitative:
+  # Global fallback for qualitative export:
+  # shared key applies to both methods unless method-specific keys are set
+  checkpoint_epoch: null
+  checkpoint_epoch_spatial: null
+  checkpoint_epoch_spectral: null
+
 uda_output:
   root: out/uda_results
 
@@ -22,18 +29,28 @@ pairs:
   - name: mnist_to_usps
     source: MNIST
     target: USPS
+    qualitative_checkpoint_epoch_spatial: 100
+    qualitative_checkpoint_epoch_spectral: 10
   - name: svhn_to_mnist
     source: SVHN
     target: MNIST
+    qualitative_checkpoint_epoch_spatial: 100
+    qualitative_checkpoint_epoch_spectral: 40
   - name: amazon_to_webcam
     source: Amazon
     target: Webcam
+    qualitative_checkpoint_epoch_spatial: 100
+    qualitative_checkpoint_epoch_spectral: 40
   - name: art_to_real_world
     source: Art
     target: Real-World
+    qualitative_checkpoint_epoch_spatial: 40
+    qualitative_checkpoint_epoch_spectral: 10
   - name: photo_to_sketch
     source: Photo
     target: Sketch
+    qualitative_checkpoint_epoch_spatial: 100
+    qualitative_checkpoint_epoch_spectral: 20
 
 training:
   image_size: 128

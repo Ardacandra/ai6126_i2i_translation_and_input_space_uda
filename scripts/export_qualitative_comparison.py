@@ -44,6 +44,41 @@ def _find_latest_checkpoint(checkpoint_dir: Path) -> Path:
     return candidates[-1]
 
 
+def _find_checkpoint(checkpoint_dir: Path, checkpoint_epoch: int | None) -> Path:
+    if checkpoint_epoch is None:
+        return _find_latest_checkpoint(checkpoint_dir)
+
+    checkpoint_path = checkpoint_dir / f"epoch_{checkpoint_epoch:03d}.pt"
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(
+            f"Requested checkpoint not found: {checkpoint_path}"
+        )
+    return checkpoint_path
+
+
+def _resolve_checkpoint_epochs(pair: DatasetPair, cfg) -> tuple[int | None, int | None]:
+    base_pair = pair.qualitative_checkpoint_epoch
+    base_global = cfg.qualitative.checkpoint_epoch
+
+    spatial_epoch = pair.qualitative_checkpoint_epoch_spatial
+    if spatial_epoch is None:
+        spatial_epoch = base_pair
+    if spatial_epoch is None:
+        spatial_epoch = cfg.qualitative.checkpoint_epoch_spatial
+    if spatial_epoch is None:
+        spatial_epoch = base_global
+
+    spectral_epoch = pair.qualitative_checkpoint_epoch_spectral
+    if spectral_epoch is None:
+        spectral_epoch = base_pair
+    if spectral_epoch is None:
+        spectral_epoch = cfg.qualitative.checkpoint_epoch_spectral
+    if spectral_epoch is None:
+        spectral_epoch = base_global
+
+    return spatial_epoch, spectral_epoch
+
+
 def _load_generator_ab(checkpoint_path: Path, device: torch.device) -> ResnetGenerator:
     model = ResnetGenerator().to(device)
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -125,8 +160,15 @@ def export_pair(
     src_batch = next(iter(loader_src))["image"].to(device)
     tgt_batch = next(iter(loader_tgt))["image"].to(device)
 
-    ckpt_spatial = _find_latest_checkpoint(cfg.output_root / pair.name / "spatial" / "checkpoints")
-    ckpt_spectral = _find_latest_checkpoint(cfg.output_root / pair.name / "spectral" / "checkpoints")
+    spatial_epoch, spectral_epoch = _resolve_checkpoint_epochs(pair, cfg)
+    ckpt_spatial = _find_checkpoint(
+        cfg.output_root / pair.name / "spatial" / "checkpoints",
+        spatial_epoch,
+    )
+    ckpt_spectral = _find_checkpoint(
+        cfg.output_root / pair.name / "spectral" / "checkpoints",
+        spectral_epoch,
+    )
 
     g_spatial = _load_generator_ab(ckpt_spatial, device)
     g_spectral = _load_generator_ab(ckpt_spectral, device)
@@ -176,6 +218,10 @@ def main() -> None:
     output_dir = Path(args.output_dir)
 
     print(f"Loaded config from: {config_path.resolve()}")
+    print(
+        "Checkpoint selection precedence: pair.method -> pair.shared -> "
+        "global.method -> global.shared -> latest"
+    )
     print("Each output figure has rows: Source, Spatial, Spectral, Target reference")
 
     for pair in cfg.pairs:

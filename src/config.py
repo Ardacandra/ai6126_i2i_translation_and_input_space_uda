@@ -15,6 +15,9 @@ class DatasetPair:
     name: str
     source: str
     target: str
+    qualitative_checkpoint_epoch: int | None = None
+    qualitative_checkpoint_epoch_spatial: int | None = None
+    qualitative_checkpoint_epoch_spectral: int | None = None
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,13 @@ class TrainingConfig:
 
 
 @dataclass(frozen=True)
+class QualitativeConfig:
+    checkpoint_epoch: int | None
+    checkpoint_epoch_spatial: int | None
+    checkpoint_epoch_spectral: int | None
+
+
+@dataclass(frozen=True)
 class ExperimentConfig:
     seed: int
     device: str
@@ -45,6 +55,7 @@ class ExperimentConfig:
     methods: List[MethodType]
     pairs: List[DatasetPair]
     training: TrainingConfig
+    qualitative: QualitativeConfig
 
 
 def _read_yaml(path: Path) -> Dict[str, Any]:
@@ -57,6 +68,25 @@ def load_config(config_path: str | Path) -> ExperimentConfig:
     raw = _read_yaml(cfg_path)
 
     pairs = [DatasetPair(**entry) for entry in raw["pairs"]]
+    for pair in pairs:
+        if pair.qualitative_checkpoint_epoch is not None and pair.qualitative_checkpoint_epoch < 1:
+            raise ValueError(
+                f"pairs.{pair.name}.qualitative_checkpoint_epoch must be >= 1 when set"
+            )
+        if (
+            pair.qualitative_checkpoint_epoch_spatial is not None
+            and pair.qualitative_checkpoint_epoch_spatial < 1
+        ):
+            raise ValueError(
+                f"pairs.{pair.name}.qualitative_checkpoint_epoch_spatial must be >= 1 when set"
+            )
+        if (
+            pair.qualitative_checkpoint_epoch_spectral is not None
+            and pair.qualitative_checkpoint_epoch_spectral < 1
+        ):
+            raise ValueError(
+                f"pairs.{pair.name}.qualitative_checkpoint_epoch_spectral must be >= 1 when set"
+            )
     training = TrainingConfig(
         image_size=int(raw["training"]["image_size"]),
         batch_size=int(raw["training"]["batch_size"]),
@@ -88,6 +118,32 @@ def load_config(config_path: str | Path) -> ExperimentConfig:
         if m not in {"spatial", "spectral"}:
             raise ValueError(f"Unsupported method in config: {m}")
 
+    raw_qualitative = raw.get("qualitative", {})
+    checkpoint_epoch_raw = raw_qualitative.get("checkpoint_epoch", None)
+    checkpoint_epoch_spatial_raw = raw_qualitative.get("checkpoint_epoch_spatial", None)
+    checkpoint_epoch_spectral_raw = raw_qualitative.get("checkpoint_epoch_spectral", None)
+
+    checkpoint_epoch = None if checkpoint_epoch_raw is None else int(checkpoint_epoch_raw)
+    checkpoint_epoch_spatial = (
+        None if checkpoint_epoch_spatial_raw is None else int(checkpoint_epoch_spatial_raw)
+    )
+    checkpoint_epoch_spectral = (
+        None if checkpoint_epoch_spectral_raw is None else int(checkpoint_epoch_spectral_raw)
+    )
+
+    if checkpoint_epoch is not None and checkpoint_epoch < 1:
+        raise ValueError("qualitative.checkpoint_epoch must be >= 1 when set")
+    if checkpoint_epoch_spatial is not None and checkpoint_epoch_spatial < 1:
+        raise ValueError("qualitative.checkpoint_epoch_spatial must be >= 1 when set")
+    if checkpoint_epoch_spectral is not None and checkpoint_epoch_spectral < 1:
+        raise ValueError("qualitative.checkpoint_epoch_spectral must be >= 1 when set")
+
+    qualitative = QualitativeConfig(
+        checkpoint_epoch=checkpoint_epoch,
+        checkpoint_epoch_spatial=checkpoint_epoch_spatial,
+        checkpoint_epoch_spectral=checkpoint_epoch_spectral,
+    )
+
     return ExperimentConfig(
         seed=int(raw["seed"]),
         device=str(raw.get("device", "auto")),
@@ -96,4 +152,5 @@ def load_config(config_path: str | Path) -> ExperimentConfig:
         methods=methods,
         pairs=pairs,
         training=training,
+        qualitative=qualitative,
     )
