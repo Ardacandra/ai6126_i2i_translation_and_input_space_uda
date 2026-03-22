@@ -172,6 +172,8 @@ def export_pair(
     rows: List[torch.Tensor] = [_denorm(src_tensors)]
     row_labels: List[str] = ["Source"]
 
+    fake_spatial: Optional[torch.Tensor] = None
+
     # ── CycleGAN spatial ──────────────────────────────────────────────────── #
     spatial_ckpt_dir = cyclegan_root / pair_name / "spatial" / "checkpoints"
     spatial_ckpt = _find_latest_checkpoint(spatial_ckpt_dir)
@@ -188,6 +190,13 @@ def export_pair(
         row_labels.append("CycleGAN")
     else:
         print(f"  [SKIP] No spatial CycleGAN checkpoint → CycleGAN row omitted")
+
+    # ── CyCADA (pixel stage) ──────────────────────────────────────────────── #
+    if fake_spatial is not None:
+        rows.append(_denorm(fake_spatial.clone()))
+        row_labels.append("CyCADA")
+    else:
+        print("  [SKIP] No spatial checkpoint available → CyCADA row omitted")
 
     # ── Spectral CycleGAN ─────────────────────────────────────────────────── #
     spectral_ckpt_dir = cyclegan_root / pair_name / "spectral" / "checkpoints"
